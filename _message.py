@@ -62,6 +62,7 @@ Résumé
             "utf8"
         ) 
         self.msg['To'] = self.destinataire
+        self.msg['Date'] = self.f_entree["published"] 
         self.msg.attach(
             MIMEText(
                 self.courriel_html.format(

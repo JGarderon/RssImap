@@ -18,11 +18,12 @@ import glob
 
 from os.path import basename
 
-
-### --- Les classes pour notre script principal 
+### --- Les classes pour notre script principal
+from _debug import DebugAff
 from _messagerie import Messagerie 
 from _message import Message 
 from _recuperateur import Recuperateur 
+
 
 ### --- Récupération de la liste des flux 
 try:
@@ -34,7 +35,7 @@ try:
     if len(fluxRSS)==0:
         raise Exception("... la liste des flux est vide !") 
 except:
-    print("ERREUR / impossible de récupérer la liste des flux") 
+    DebugAff(99,"ERREUR / impossible de récupérer la liste des flux") 
     sys.exit()
 
 
@@ -52,7 +53,7 @@ try:
     if len(messageries)==0:
         raise Exception("... la liste des messageries est vide !") 
 except:
-    print("ERREUR / impossible de récupérer la liste des messageries") 
+    DebugAff(99,"ERREUR / impossible de récupérer la liste des messageries") 
     sys.exit() 
 
 
@@ -68,7 +69,14 @@ def Correspondance(dossier_travail,entrees_index,threadFlux,connexion):
     try:
         connexion.connecter()
         for entree in entrees_index:
-            entree_id = basename(entree).split(".")[0] 
+            entree_id = basename(entree).split(".")[0]
+            try:
+                with open("."+threadFlux.flux_dossier+"/"+entree_id+".article","r") as article_fichier:
+                    article = article_fichier.read() 
+                article_fichier.close()
+            except Exception as e:
+                DebugAff(0,"-- Un item sans article en cache... "+threadFlux.flux_dossier+"/"+entree_id+".article : "+str(e)) 
+                article = "" 
             if not os.path.exists(dossier_travail+"/"+entree_id):
                 entree_elements = json.loads(open(entree,"r").read()) 
                 date = datetime.strptime(
@@ -81,7 +89,7 @@ def Correspondance(dossier_travail,entrees_index,threadFlux,connexion):
                         "flux_titre": threadFlux.titre, 
                         "sujet": entree_elements["title"],
                         "destinataire": connexion.adresse, 
-                        "article": "", 
+                        "article": article, 
                         "entree": entree_elements  
                     }).msg,
                     date  
@@ -90,7 +98,7 @@ def Correspondance(dossier_travail,entrees_index,threadFlux,connexion):
                         pass 
         connexion.deconnecter()
     except Exception  as e:
-        print("ERREUR / lors de la correspondance : "+str(e)) 
+        DebugAff(10,"ERREUR / lors de la correspondance : "+str(e)) 
 
 ### --- Conservation des threads 
 fluxRSSThreads = []
@@ -98,16 +106,17 @@ fluxRSSThreads = []
 ### --- Lancement des threads pour les boucles de récupération
 ### --- --- ... d'abord les threads de récupération de flux 
 try: 
-    for flux in fluxRSS:
-        print("-- Lancement du Thread pour le flux "+flux) 
+    for flux in fluxRSS: 
+        DebugAff(0,"-- Lancement du Thread pour le flux "+flux) 
         _thread = Recuperateur(flux)
         _thread.start()
+        time.sleep(1) 
         fluxRSSThreads.append(_thread)
     time.sleep(1) 
 except Exception as e:
-    print("ERREUR / lors du lancement des threads pour la récupération des flux : "+str(e))
+    DebugAff(99,"ERREUR / lors du lancement des threads pour la récupération des flux : "+str(e))
 
-print("-- Fin de lancement des threads")   
+DebugAff(0,"-- Fin de lancement des threads")   
 
 ### --- --- ... enfin la boucle pour que le script "main" ne s'arrête pas
 _boucle = True 
@@ -115,6 +124,10 @@ while True:
     try: 
         for threadFlux in fluxRSSThreads:
             entrees_index = glob.glob("."+threadFlux.flux_dossier+"/*.index") 
+##            print("--------------") 
+##            print(threadFlux.flux) 
+##            print(threadFlux.flux_dossier) 
+##            print(entrees_index)
             for connexion in connections: 
                 dossier_travail = connexion.dossier+threadFlux.flux_dossier
                 if os.path.exists(dossier_travail):
@@ -124,9 +137,9 @@ while True:
                         threadFlux,
                         connexion 
                     )
-        time.sleep(60*20) 
+        time.sleep(60*7) 
     except Exception as e:
-        print("ERREUR / lors de l'enregistrement des flux dans les messageries : "+str(e)) 
+        DebugAff(99,"ERREUR / lors de l'enregistrement des flux dans les messageries : "+str(e)) 
         _boucle = False 
 
 
